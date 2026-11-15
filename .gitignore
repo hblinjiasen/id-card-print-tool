@@ -1,0 +1,23 @@
+# 证件照片与含个人信息的成品 —— 严禁提交到公开仓库
+*.jpg
+*.jpeg
+*.heic
+*.webp
+ID_front_*.png
+ID_card_*.pdf
+_card_out*.png
+_overlay*.png
+_sample*
+
+# 回归测试与临时文件
+_*
+*.rgb
+*.log
+_dom.txt
+_chrome.err
+
+# 编辑器与系统文件
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>身份证照片校正与 1:1 打印工具</title>
+<style>
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --line:#dfe4ea; --line-soft:#edf0f3;
+  --ink:#1c2733; --ink-2:#5c6875; --ink-3:#8a96a3;
+  --accent:#0f6e56; --accent-soft:#e1f5ee; --blue:#185fa5; --blue-soft:#e6f1fb;
+  --warn:#854f0b; --warn-soft:#faeeda;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1380px;margin:0 auto;padding:24px 24px 60px}
+header.top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:20px}
+h1{font-size:20px;font-weight:600;margin:0 0 4px;letter-spacing:.2px}
+.sub{color:var(--ink-2);font-size:13px;margin:0}
+.badge{display:inline-flex;align-items:center;gap:7px;background:var(--accent-soft);color:var(--accent);
+  border:1px solid #b9e5d3;border-radius:999px;padding:6px 13px;font-size:12px;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block}
+.layout{display:grid;grid-template-columns:352px minmax(0,1fr);gap:18px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.panel-hd{padding:13px 16px;border-bottom:1px solid var(--line-soft);font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+.panel-bd{padding:16px}
+.sec{margin-bottom:20px}
+.sec:last-child{margin-bottom:0}
+.sec-t{font-size:12px;font-weight:600;color:var(--ink-2);letter-spacing:.4px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.sec-t i{font-style:normal;width:18px;height:18px;border-radius:5px;background:var(--accent-soft);color:var(--accent);
+  display:inline-flex;align-items:center;justify-content:center;font-size:11px}
+.drop-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.drop{border:1.5px dashed #c6d0d9;border-radius:9px;min-height:96px;background:#fafcfd;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:8px;
+  transition:border-color .15s,background .15s;position:relative;overflow:hidden}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop.has{border-style:solid;border-color:#b9e5d3}
+.drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9}
+.drop .lbl{position:relative;z-index:1;font-size:12px;font-weight:600;background:rgba(255,255,255,.86);
+  padding:2px 8px;border-radius:5px}
+.drop .hint{position:relative;z-index:1;font-size:11px;color:var(--ink-2);background:rgba(255,255,255,.86);padding:1px 6px;border-radius:4px}
+.drop .ok{position:absolute;right:6px;top:6px;z-index:2;background:var(--accent);color:#fff;border-radius:50%;
+  width:17px;height:17px;font-size:11px;display:flex;align-items:center;justify-content:center}
+input[type=file]{display:none}
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 12px;
+  font-size:12.5px;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s;white-space:nowrap}
+.btn:hover{background:#f3f6f8;border-color:#b9c5d0}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{background:#0b5744}
+.btn.blue{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+.btn.blue:hover{background:#124b83}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn-row .btn{flex:1 1 auto}
+.opts{display:flex;flex-direction:column;gap:9px}
+.opt{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.opt input{accent-color:var(--accent);width:15px;height:15px;margin:0;cursor:pointer}
+.field{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;
+  font-family:inherit;color:var(--ink);background:#fff}
+.field:focus{outline:2px solid #b9e5d3;outline-offset:0;border-color:var(--accent)}
+.note{background:var(--warn-soft);border:1px solid #f0dcb8;color:#6b4210;border-radius:9px;padding:10px 12px;font-size:11.5px;line-height:1.65}
+.note b{font-weight:600}
+.legal{background:#f7f9fb;border:1px solid var(--line-soft);color:var(--ink-2);border-radius:9px;padding:10px 12px;font-size:11.5px;line-height:1.65}
+.legal b{color:var(--ink);font-weight:600}
+.log{height:74px;overflow:auto;background:#f7f9fb;border:1px solid var(--line-soft);border-radius:8px;
+  padding:8px 10px;font-size:11.5px;color:var(--ink-2);font-family:ui-monospace,Consolas,monospace;line-height:1.7}
+.log div span{color:var(--ink-3);margin-right:6px}
+.tabs{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line-soft)}
+.tab{border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 13px;font-size:12px;cursor:pointer;color:var(--ink-2)}
+.tab.on{background:var(--blue-soft);border-color:#a9cdf0;color:var(--blue);font-weight:600}
+.canvas-area{padding:14px;background:#eef1f4;position:relative;min-height:260px;display:flex;align-items:center;justify-content:center}
+#view{display:block;width:100%;height:auto;background:#fff;touch-action:none;cursor:crosshair;box-shadow:0 1px 4px rgba(20,35,50,.12)}
+.empty{color:var(--ink-3);font-size:13px;text-align:center;padding:60px 20px}
+.tip{padding:9px 14px;font-size:11.5px;color:var(--ink-2);border-top:1px solid var(--line-soft);background:#fbfcfd}
+.res{padding:14px;border-top:1px solid var(--line-soft)}
+.res-t{font-size:12px;font-weight:600;color:var(--ink-2);margin:0 0 9px;display:flex;justify-content:space-between}
+.res-frame{border:1px dashed #c6d0d9;border-radius:8px;background:#fafcfd;padding:10px;display:flex;justify-content:center}
+#resImg{width:100%;max-width:420px;height:auto;display:none;border-radius:3px;box-shadow:0 1px 3px rgba(20,35,50,.14)}
+.spec{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.spec div{background:#f7f9fb;border-radius:7px;padding:7px 9px}
+.spec span{display:block;font-size:10.5px;color:var(--ink-3)}
+.spec b{font-size:12px;font-weight:600}
+.sheet-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:26px 0 12px}
+.sheet-bar h2{font-size:15px;font-weight:600;margin:0}
+.sheet-bar p{font-size:12px;color:var(--ink-2);margin:2px 0 0}
+#sheetWrap{zoom:.86}
+@media print{#sheetWrap{zoom:1}}
+#sheet{position:relative;width:210mm;height:297mm;background:#fff;box-shadow:0 3px 18px rgba(20,35,50,.14);
+  margin:0 auto;overflow:hidden;color:#111}
+.card-box{position:absolute;width:85.6mm;height:53.98mm;left:62.2mm;overflow:hidden}
+.card-box img{position:absolute;inset:0;width:100%;height:100%;display:block}
+.card-box .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#8a96a3;font-size:3.4mm;border:0.2mm dashed #cbd2d9;box-sizing:border-box}
+.wm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+  transform:rotate(-24deg);color:rgba(90,105,120,.32);font-size:4.2mm;line-height:1.5;letter-spacing:.3mm;
+  pointer-events:none;font-weight:600;white-space:nowrap}
+.calib{position:absolute;left:18mm;top:18mm;width:20mm;height:20mm;border:0.2mm solid #333;box-sizing:border-box;
+  display:flex;align-items:center;justify-content:center;font-size:2.6mm;color:#333}
+.calib-cap{position:absolute;left:18mm;top:39.5mm;width:26mm;font-size:2.4mm;color:#555;line-height:1.5}
+.sheet-ttl{position:absolute;left:62.2mm;top:24mm;width:85.6mm;text-align:center;font-size:3.2mm;color:#444;letter-spacing:.5mm}
+.side-lbl{position:absolute;left:18mm;width:36mm;font-size:2.8mm;color:#666;text-align:right}
+.side-lbl.f{top:64mm}.side-lbl.b{top:128mm}
+.sheet-foot{position:absolute;left:18mm;right:18mm;bottom:16mm;border-top:0.2mm solid #d8dde2;padding-top:3mm;
+  font-size:2.5mm;color:#666;line-height:1.7}
+.sheet-foot b{color:#333}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  html,body{background:#fff;margin:0;padding:0}
+  /* 校准标尺与底部核对说明仅供屏幕预览，不进入打印件 */
+  .calib,.calib-cap,.sheet-foot{display:none!important}
+  body>.wrap>*:not(.sheet-bar):not(#sheetWrap){display:none!important}
+  .wrap{max-width:none;margin:0;padding:0}
+  .sheet-bar{display:none!important}
+  #sheetWrap{zoom:1!important;margin:0;padding:0;width:210mm}
+  #sheet{box-shadow:none;margin:0;width:210mm!important;height:297mm!important}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}
+@media screen and (max-width:980px){.layout{grid-template-columns:1fr}#sheetWrap{zoom:.62}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <h1>身份证照片校正与 1:1 打印工具</h1>
+    <p class="sub">拍照自动定位四角 → 透视校正 → ID-1 标准尺寸 → A4 实际大小打印</p>
+  </div>
+  <div class="badge"><span class="dot"></span>纯本地处理 · 零网络请求 · 照片不出设备</div>
+</header>
+
+<div class="layout">
+
+  <section class="panel">
+    <div class="panel-hd">操作面板 <span style="font-weight:400;color:var(--ink-3);font-size:11px">4 个步骤</span></div>
+    <div class="panel-bd">
+
+      <div class="sec">
+        <div class="sec-t"><i>1</i>上传身份证照片</div>
+        <div class="drop-row">
+          <div class="drop" id="dropFront" data-side="front">
+            <div class="lbl">人像面</div><div class="hint">点击 / 拖入 / 粘贴</div>
+          </div>
+          <div class="drop" id="dropBack" data-side="back">
+            <div class="lbl">国徽面</div><div class="hint">点击 / 拖入 / 粘贴</div>
+          </div>
+        </div>
+        <input type="file" id="fileFront" accept="image/*">
+        <input type="file" id="fileBack" accept="image/*">
+        <p style="font-size:11px;color:var(--ink-3);margin:8px 0 0">建议在自然光下平拍、卡面完整入镜、背景与卡面反差明显。</p>
+      </div>
+
+      <div class="sec">
+        <div class="sec-t"><i>2</i>定位与校正</div>
+        <div class="btn-row">
+          <button class="btn primary" id="btnDetect">自动识别四角</button>
+          <button class="btn" id="btnReset">重置框</button>
+        </div>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn" id="btnSnap">边界智能贴合</button>
+          <button class="btn" id="btnRotate">照片旋转 90°</button>
+        </div>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn" id="btnSwap">交换正反面</button>
+        </div>
+        <p style="font-size:11px;color:var(--ink-3);margin:8px 0 0">自动定位后请核对四角；偏差较大时先点「边界智能贴合」，再拖动圆点。斜拍导致卡片呈梯形时，需分别调整四个角点（自动框始终为矩形）。</p>
+      </div>
+
+      <div class="sec">
+        <div class="sec-t"><i>3</i>输出选项</div>
+        <div class="opts">
+          <label class="opt"><input type="checkbox" id="optLevels" checked>自动色阶（拉伸亮度范围）</label>
+          <label class="opt"><input type="checkbox" id="optSharp" checked>轻度锐化（补偿拍摄模糊）</label>
+          <label class="opt"><input type="checkbox" id="optRound">按 R3.18mm 圆角裁切</label>
+          <label class="opt"><input type="checkbox" id="optWm" checked>打印页叠加用途水印</label>
+        </div>
+        <input class="field" id="wmText" style="margin-top:10px" value="仅供办理业务使用" maxlength="24">
+      </div>
+
+      <div class="sec">
+        <div class="sec-t"><i>4</i>生成与打印</div>
+        <div class="btn-row">
+          <button class="btn blue" id="btnBuild">生成 A4 打印页</button>
+          <button class="btn" id="btnPrint">打印</button>
+        </div>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn" id="btnDlF">下载人像面 PNG</button>
+          <button class="btn" id="btnDlB">下载国徽面 PNG</button>
+        </div>
+        <div class="log" id="log" style="margin-top:10px"><div><span>—</span>等待上传照片</div></div>
+      </div>
+
+      <div class="sec">
+        <div class="note"><b>打印设置（六项必须逐条核对）</b><br>
+        ① 纸张 A4 纵向；② 边距选「<b>无</b>」（不能用「默认」）；③ 缩放选「默认 / 实际大小 100%」，<b>不要填自定义百分比</b>，也不要选「适应纸张」；④ 每版打印页数 1；⑤ 关闭「双面打印」与页眉页脚；⑥ 勾选「背景图形」。<br>
+        打印后更可靠的核对方式是直接量卡片宽度，应为 <b>85.6 mm</b>（允许 ±0.3 mm）；若明显偏小，说明缩放或边距仍被改动。<br>
+        左上 20 mm 标尺与页面底部「打印核对」说明仅供屏幕预览，<b>不会打印出来</b>；打印件只保留标题、卡片图与用途水印。</div>
+      </div>
+
+      <div class="sec">
+        <div class="legal"><b>合规提示</b><br>
+        身份证信息属敏感个人信息。本工具不上传、不存储、不写缓存，全部运算在浏览器内存中完成，关闭页面即销毁。请为打印件标注用途、勿随意丢弃，业务办结后及时删除原图与打印件。</div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="tabs">
+      <button class="tab on" data-side="front" id="tabFront">人像面 · 编辑</button>
+      <button class="tab" data-side="back" id="tabBack">国徽面 · 编辑</button>
+      <span style="flex:1"></span>
+      <span id="confTag" style="font-size:11px;color:var(--ink-3);align-self:center">拖动四角圆点可精确定位</span>
+    </div>
+    <div class="canvas-area" id="canvasArea">
+      <div class="empty" id="emptyHint">请先上传身份证照片</div>
+      <canvas id="view" style="display:none"></canvas>
+    </div>
+    <div class="tip">四角顺序：左上 → 右上 → 右下 → 左下。校正后四边应为卡片的真实外沿，不含桌面背景。</div>
+    <div class="res">
+      <div class="res-t"><span>校正结果预览</span><span id="resState" style="font-weight:400;color:var(--ink-3)">未生成</span></div>
+      <div class="res-frame"><img id="resImg" alt="校正结果"></div>
+      <div class="spec">
+        <div><span>物理尺寸</span><b>85.6 × 53.98 mm</b></div>
+        <div><span>输出像素 @300dpi</span><b>1011 × 638 px</b></div>
+        <div><span>长宽比</span><b>1.585 (ID-1)</b></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="sheet-bar">
+  <div><h2>A4 打印页预览</h2><p>1:1 实际尺寸排版，正反面上下排列；标尺与核对说明仅屏幕可见，不会打印</p></div>
+  <div class="btn-row" style="flex:0 0 auto"><button class="btn blue" id="btnPrint2">打印此页</button></div>
+</div>
+
+<div id="sheetWrap">
+  <div id="sheet">
+    <div class="calib">20 mm</div>
+    <div class="calib-cap">1:1 校准标尺（仅预览）<br>打印件不含此标尺</div>
+    <div class="sheet-ttl">居民身份证复印件</div>
+    <div class="side-lbl f">人像面</div>
+    <div class="side-lbl b">国徽面</div>
+    <div class="card-box" id="boxFront" style="top:40mm">
+      <div class="ph">未上传人像面</div><img id="imgFront" alt="人像面">
+      <div class="wm" id="wmFront"><span>仅供办理业务使用<br>再次复印无效</span></div>
+    </div>
+    <div class="card-box" id="boxBack" style="top:104mm">
+      <div class="ph">未上传国徽面</div><img id="imgBack" alt="国徽面">
+      <div class="wm" id="wmBack"><span>仅供办理业务使用<br>再次复印无效</span></div>
+    </div>
+    <div class="sheet-foot">
+      <b>打印核对：</b>纸张 A4 纵向；边距「无」；缩放「默认 / 100% 实际大小」（不得用自定义百分比）；关闭双面与页眉页脚；勾选背景图形。<br>
+      打印后请量卡片宽度，应为 85.6 mm（±0.3 mm）。本页由本地浏览器生成，未上传任何图像数据。用途限定：仅供本页水印所载事项使用，再次复印无效。
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+"use strict";
+
+const OUT_W = 1011, OUT_H = 638;
+const RATIO = 85.6 / 53.98;
+const $ = id => document.getElementById(id);
+const sides = {
+  front: {work:null, data:null, w:0, h:0, pts:null, out:null, url:null, fileUrl:null},
+  back:  {work:null, data:null, w:0, h:0, pts:null, out:null, url:null, fileUrl:null}
+};
+let active = "front";
+let dragIdx = -1;
+let renderTimer = null;
+const view = $("view"), vctx = view.getContext("2d");
+
+function log(msg){
+  const box = $("log");
+  const d = document.createElement("div");
+  const t = new Date().toTimeString().slice(0,8);
+  d.innerHTML = "<span>" + t + "</span>" + String(msg).replace(/</g,"&lt;");
+  box.appendChild(d);
+  box.scrollTop = box.scrollHeight;
+  while(box.children.length > 40) box.removeChild(box.firstChild);
+}
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function setConf(det){
+  const el=$("confTag");
+  if(!el) return;
+  if(!det.ok){ el.textContent="自动定位置信度不足 · 请手动拖动四角"; el.style.color="#a32d2d"; }
+  else if(det.conf<0.7){ el.textContent="自动定位置信度 "+Math.round(det.conf*100)+"% · 建议核对四角"; el.style.color="#854f0b"; }
+  else { el.textContent="自动定位置信度 "+Math.round(det.conf*100)+"% · 可拖动四角微调"; el.style.color="#0f6e56"; }
+}
+
+async function decode(file){
+  if(typeof createImageBitmap === "function"){
+    try{ return await createImageBitmap(file, {imageOrientation:"from-image"}); }catch(e){}
+  }
+  return new Promise((res,rej)=>{
+    const u = URL.createObjectURL(file);
+    const im = new Image();
+    im.onload = ()=>{ res(im); };
+    im.onerror = ()=>{ URL.revokeObjectURL(u); rej(new Error("图片解码失败")); };
+    im.src = u;
+  });
+}
+
+function defaultPts(w,h){
+  const mx = w*0.07, my = h*0.07;
+  return [[mx,my],[w-mx,my],[w-mx,h-my],[mx,h-my]];
+}
+
+async function loadSide(file, side){
+  if(!file || !file.type.startsWith("image/")){ log("请选择图片文件"); return; }
+  log("正在解码 " + (side==="front"?"人像面":"国徽面") + " ...");
+  try{
+    const bmp = await decode(file);
+    const ow = bmp.width || bmp.naturalWidth, oh = bmp.height || bmp.naturalHeight;
+    const s = Math.min(1, 1600/Math.max(ow,oh));
+    const w = Math.max(1,Math.round(ow*s)), h = Math.max(1,Math.round(oh*s));
+    const cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    const cx = cv.getContext("2d",{willReadFrequently:true});
+    cx.drawImage(bmp,0,0,w,h);
+    const data = cx.getImageData(0,0,w,h);
+    if(bmp.close) bmp.close();
+    const o = sides[side];
+    if(o.fileUrl) URL.revokeObjectURL(o.fileUrl);
+    o.work = cv; o.data = data; o.w = w; o.h = h;
+    o.pts = defaultPts(w,h); o.out = null; o.url = null;
+    o.fileUrl = URL.createObjectURL(file);
+    const drop = $(side==="front"?"dropFront":"dropBack");
+    drop.classList.add("has");
+    let im = drop.querySelector("img");
+    if(!im){ im = document.createElement("img"); drop.insertBefore(im,drop.firstChild); }
+    im.src = o.fileUrl;
+    let ok = drop.querySelector(".ok");
+    if(!ok){ ok = document.createElement("div"); ok.className="ok"; ok.textContent="✓"; drop.appendChild(ok); }
+    setActive(side);
+    log("已载入 " + ow + "×" + oh + "，工作图 " + w + "×" + h);
+    const det = autoDetect(side);
+    setConf(det);
+    log(det.ok ? "自动定位完成（置信度 " + Math.round(det.conf*100) + "%），请核对四角" : "自动定位置信度不足，已给出默认框，请手动拖动四角");
+    scheduleRender(0);
+  }catch(e){ log("载入失败：" + e.message); }
+}
+
+/* ---------- 自动四角检测 v2：带符号梯度 + 分段一致性 + 区域先验 ---------- */
+function absPeaks(arr,len,minDist,count){
+  const cand=[];
+  for(let i=2;i<=len-3;i++){
+    const a=Math.abs(arr[i]);
+    if(a>0.001 && a>=Math.abs(arr[i-1]) && a>=Math.abs(arr[i+1])) cand.push([a,i]);
+  }
+  cand.sort((p,q)=>q[0]-p[0]);
+  const out=[2];
+  if(len-3>2) out.push(len-3);
+  for(let k=0;k<cand.length;k++){
+    const i=cand[k][1];
+    if(out.every(j=>Math.abs(j-i)>=minDist)) out.push(i);
+    if(out.length>=count) break;
+  }
+  return out.sort((a,b)=>a-b);
+}
+function integral(src,W,H){
+  const s=W+1, I=new Float64Array(s*(H+1));
+  for(let y=0;y<H;y++){
+    let row=0;
+    for(let x=0;x<W;x++){ row+=src[y*W+x]; I[(y+1)*s+x+1]=I[y*s+x+1]+row; }
+  }
+  return I;
+}
+function rectSum(I,W,x1,y1,x2,y2){
+  const s=W+1;
+  return I[(y2+1)*s+x2+1]-I[y1*s+x2+1]-I[(y2+1)*s+x1]+I[y1*s+x1];
+}
+function autoDetect(side){
+  const o=sides[side];
+  if(!o.data) return {ok:false,conf:0,score:0};
+  const W=Math.min(640,o.w), H=Math.max(8,Math.round(o.h*W/o.w)), N=W*H;
+  const sx=o.w/W, sy=o.h/H, d=o.data.data, ow=o.w, oh=o.h;
+  const lum=new Float32Array(N), blue=new Float32Array(N);
+  for(let v=0;v<H;v++){
+    const y0=Math.floor(v*sy), y1=Math.min(oh,Math.max(y0+Math.max(2,Math.ceil(sy)+1),Math.round((v+1)*sy)));
+    for(let u=0;u<W;u++){
+      const x0=Math.floor(u*sx), x1=Math.min(ow,Math.max(x0+Math.max(2,Math.ceil(sx)+1),Math.round((u+1)*sx)));
+      let L=0,B=0,n=0;
+      for(let y=y0;y<y1;y++){
+        const base=y*ow;
+        for(let x=x0;x<x1;x++){
+          const k=(base+x)*4;
+          L+=0.299*d[k]+0.587*d[k+1]+0.114*d[k+2];
+          B+=d[k+2]-d[k]; n++;
+        }
+      }
+      lum[v*W+u]=L/n; blue[v*W+u]=B/n;
+    }
+  }
+  const tmp=new Float32Array(N), sm=new Float32Array(N);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const i=y*W+x;
+    tmp[i]=(lum[y*W+Math.max(0,x-1)]+lum[i]+lum[y*W+Math.min(W-1,x+1)])/3;
+  }
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    sm[y*W+x]=(tmp[Math.max(0,y-1)*W+x]+tmp[y*W+x]+tmp[Math.min(H-1,y+1)*W+x])/3;
+  }
+  const gx=new Float32Array(N), gy=new Float32Array(N);
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+    const i=y*W+x;
+    gx[i]=(sm[i-W+1]+2*sm[i+1]+sm[i+W+1])-(sm[i-W-1]+2*sm[i-1]+sm[i+W-1]);
+    gy[i]=(sm[i+W-1]+2*sm[i+W]+sm[i+W+1])-(sm[i-W-1]+2*sm[i-W]+sm[i-W+1]);
+  }
+  const rowP=new Float32Array(N), colP=new Float32Array(N);
+  for(let y=0;y<H;y++){
+    let s=0; const r=y*W;
+    for(let x=0;x<W;x++){ s+=gy[r+x]; rowP[r+x]=s; }
+  }
+  for(let x=0;x<W;x++){
+    let s=0;
+    for(let y=0;y<H;y++){ const i=y*W+x; s+=gx[i]; colP[i]=s; }
+  }
+  const lum2=new Float32Array(N);
+  for(let i=0;i<N;i++) lum2[i]=lum[i]*lum[i];
+  const Ilum=integral(lum,W,H), Ilum2=integral(lum2,W,H), Iblue=integral(blue,W,H);
+  const K=6;
+  function hEdge(y,x1,x2){
+    const w=x2-x1; if(w<24) return 0;
+    let sum=0,worst=Infinity;
+    for(let k=0;k<K;k++){
+      const a=x1+Math.floor(w*k/K), b=x1+Math.floor(w*(k+1)/K)-1;
+      if(b<=a) continue;
+      const s=Math.abs(rowP[y*W+b]-(a>0?rowP[y*W+a-1]:0))/(b-a+1);
+      sum+=s; if(s<worst) worst=s;
+    }
+    return 0.55*(sum/K)+0.45*(worst===Infinity?0:worst);
+  }
+  function vEdge(x,y1,y2){
+    const h=y2-y1; if(h<24) return 0;
+    let sum=0,worst=Infinity;
+    for(let k=0;k<K;k++){
+      const a=y1+Math.floor(h*k/K), b=y1+Math.floor(h*(k+1)/K)-1;
+      if(b<=a) continue;
+      const s=Math.abs(colP[b*W+x]-(a>0?colP[(a-1)*W+x]:0))/(b-a+1);
+      sum+=s; if(s<worst) worst=s;
+    }
+    return 0.55*(sum/K)+0.45*(worst===Infinity?0:worst);
+  }
+  function region(x1,y1,x2,y2){
+    const a1=(x2-x1+1)*(y2-y1+1);
+    const inMean=rectSum(Ilum,W,x1,y1,x2,y2)/a1;
+    const inM2=rectSum(Ilum2,W,x1,y1,x2,y2)/a1;
+    const inStd=Math.sqrt(Math.max(0,inM2-inMean*inMean));
+    const inBlue=rectSum(Iblue,W,x1,y1,x2,y2)/a1;
+    const t=Math.max(4,Math.round(Math.min(W,H)*0.02));
+    const ux1=Math.max(0,x1-t), uy1=Math.max(0,y1-t);
+    const ux2=Math.min(W-1,x2+t), uy2=Math.min(H-1,y2+t);
+    const oa=(ux2-ux1+1)*(uy2-uy1+1);
+    const ringMean=(rectSum(Ilum,W,ux1,uy1,ux2,uy2)-rectSum(Ilum,W,x1,y1,x2,y2))/Math.max(1,oa-a1);
+    return {contrast:inMean-ringMean, std:inStd, blue:inBlue};
+  }
+  const colG=new Float32Array(W), rowG=new Float32Array(H);
+  for(let x=0;x<W;x++) colG[x]=colP[(H-1)*W+x];
+  for(let y=0;y<H;y++) rowG[y]=rowP[y*W+W-1];
+  const xs=absPeaks(colG,W,Math.max(10,Math.round(W*0.028)),16);
+  const ys=absPeaks(rowG,H,Math.max(10,Math.round(H*0.028)),16);
+  const RATIO=85.6/53.98;
+  let best=null, bestScore=-Infinity;
+  for(let a=0;a<xs.length;a++) for(let b=a+1;b<xs.length;b++){
+    const w=xs[b]-xs[a];
+    if(w<W*0.30) continue;
+    for(let c=0;c<ys.length;c++) for(let d=c+1;d<ys.length;d++){
+      const h=ys[d]-ys[c];
+      if(h<H*0.18) continue;
+      const r=w/h;
+      if(r<1.42||r>1.80) continue;
+      const top=hEdge(ys[c],xs[a],xs[b]), bot=hEdge(ys[d],xs[a],xs[b]);
+      const lef=vEdge(xs[a],ys[c],ys[d]), rig=vEdge(xs[b],ys[c],ys[d]);
+      const edge=(top+bot+lef+rig)/4;
+      const rg=region(xs[a],ys[c],xs[b],ys[d]);
+      const areaRatio=(w*h)/(W*H);
+      const smooth=Math.max(0,1-rg.std/45);
+      const colorBias=Math.max(-12,Math.min(12,rg.blue));
+      const cx=(xs[a]+xs[b])/2, cy=(ys[c]+ys[d])/2;
+      const edgeTerm=Math.min(edge,110);
+      const contrastTerm=rg.contrast>=0
+        ? Math.min(35,rg.contrast)*0.9
+        : Math.max(-40,rg.contrast)*0.8;
+      const sizeFactor=Math.max(0.15,Math.min(1,areaRatio/0.28));
+      const sc=(edgeTerm
+        + contrastTerm
+        + smooth*10
+        + colorBias*0.35
+        + Math.min(areaRatio,0.65)*22
+        - Math.abs(r-RATIO)*24
+        - (Math.abs(cx-W/2)/W+Math.abs(cy-H/2)/H)*4)*sizeFactor;
+      if(sc>bestScore){ bestScore=sc; best=[xs[a],xs[b],ys[c],ys[d]]; }
+    }
+  }
+  const conf=Math.max(0,Math.min(1,(bestScore-25)/60));
+  if(!best||conf<0.30){
+    o.pts=defaultPts(o.w,o.h); o.conf=0;
+    return {ok:false,conf:0,score:bestScore};
+  }
+  let [x1,x2,y1,y2]=best;
+  const refineH=(y,xx1,xx2)=>{
+    let by=y,bs=-1;
+    for(let t=-14;t<=14;t++){
+      const yy=y+t; if(yy<1||yy>=H-1) continue;
+      const s=hEdge(yy,xx1,xx2)+0.5*hEdge(yy+1,xx1,xx2);
+      if(s>bs){bs=s;by=yy;}
+    }
+    return by;
+  };
+  const refineV=(x,yy1,yy2)=>{
+    let bx=x,bs=-1;
+    for(let t=-14;t<=14;t++){
+      const xx=x+t; if(xx<1||xx>=W-1) continue;
+      const s=vEdge(xx,yy1,yy2)+0.5*vEdge(xx+1,yy1,yy2);
+      if(s>bs){bs=s;bx=xx;}
+    }
+    return bx;
+  };
+  y1=refineH(y1,x1,x2); y2=refineH(y2,x1,x2);
+  x1=refineV(x1,y1,y2); x2=refineV(x2,y1,y2);
+  o.pts=[[x1*sx,y1*sy],[x2*sx,y1*sy],[x2*sx,y2*sy],[x1*sx,y2*sy]];
+  o.conf=conf;
+  return {ok:true,conf:conf,score:bestScore};
+}
+
+/* ---------- 单应矩阵与透视变换 ---------- */
+function homography(src,dst){
+  const A = [];
+  for(let i=0;i<4;i++){
+    const x=src[i][0], y=src[i][1], u=dst[i][0], v=dst[i][1];
+    A.push([x,y,1,0,0,0,-u*x,-u*y,u]);
+    A.push([0,0,0,x,y,1,-v*x,-v*y,v]);
+  }
+  const n=8;
+  for(let c=0;c<n;c++){
+    let p=c;
+    for(let r=c+1;r<n;r++) if(Math.abs(A[r][c])>Math.abs(A[p][c])) p=r;
+    const tmp=A[c]; A[c]=A[p]; A[p]=tmp;
+    const dv=A[c][c];
+    if(Math.abs(dv)<1e-10) continue;
+    for(let k=c;k<=n;k++) A[c][k]/=dv;
+    for(let r=0;r<n;r++){
+      if(r===c) continue;
+      const f=A[r][c];
+      if(f===0) continue;
+      for(let k=c;k<=n;k++) A[r][k]-=f*A[c][k];
+    }
+  }
+  const h = A.map(r=>r[n]); h.push(1);
+  return h;
+}
+function bilinear(d,w,h,x,y,c){
+  if(x<0||y<0||x>=w-1||y>=h-1) return 255;
+  const x0=x|0, y0=y|0, fx=x-x0, fy=y-y0;
+  const i00=(y0*w+x0)*4+c, i10=i00+4, i01=i00+w*4, i11=i01+4;
+  return (1-fx)*(1-fy)*d[i00] + fx*(1-fy)*d[i10] + (1-fx)*fy*d[i01] + fx*fy*d[i11];
+}
+function warp(o){
+  const dstPts = [[0,0],[OUT_W-1,0],[OUT_W-1,OUT_H-1],[0,OUT_H-1]];
+  const H = homography(dstPts, o.pts);
+  const cv = document.createElement("canvas");
+  cv.width=OUT_W; cv.height=OUT_H;
+  const cx = cv.getContext("2d");
+  const img = cx.createImageData(OUT_W,OUT_H);
+  const out = img.data, d = o.data.data, sw=o.w, sh=o.h;
+  for(let v=0;v<OUT_H;v++){
+    for(let u=0;u<OUT_W;u++){
+      const den = H[6]*u + H[7]*v + 1;
+      const x = (H[0]*u + H[1]*v + H[2])/den;
+      const y = (H[3]*u + H[4]*v + H[5])/den;
+      const k = (v*OUT_W+u)*4;
+      if(x<0||y<0||x>=sw-1||y>=sh-1){ out[k]=255;out[k+1]=255;out[k+2]=255;out[k+3]=255; continue; }
+      out[k]   = bilinear(d,sw,sh,x,y,0);
+      out[k+1] = bilinear(d,sw,sh,x,y,1);
+      out[k+2] = bilinear(d,sw,sh,x,y,2);
+      out[k+3] = 255;
+    }
+  }
+  if($("optLevels").checked) autoLevels(out);
+  if($("optSharp").checked) unsharp(out,OUT_W,OUT_H,0.42);
+  cx.putImageData(img,0,0);
+  if($("optRound").checked){
+    cx.globalCompositeOperation = "destination-in";
+    cx.fillStyle = "#000";
+    roundedPath(cx,0,0,OUT_W,OUT_H,37.5);
+    cx.fill();
+    cx.globalCompositeOperation = "source-over";
+  }
+  o.out = cv; o.url = cv.toDataURL("image/png");
+}
+function roundedPath(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+function autoLevels(d){
+  const hist=[new Uint32Array(256),new Uint32Array(256),new Uint32Array(256)];
+  const n=d.length/4;
+  for(let i=0;i<d.length;i+=4){ hist[0][d[i]]++; hist[1][d[i+1]]++; hist[2][d[i+2]]++; }
+  const lut=[];
+  for(let c=0;c<3;c++){
+    let acc=0, lo=0, hi=255;
+    const cut=n*0.012;
+    for(let k=0;k<256;k++){ acc+=hist[c][k]; if(acc>=cut){ lo=k; break; } }
+    acc=0;
+    for(let k=255;k>=0;k--){ acc+=hist[c][k]; if(acc>=cut){ hi=k; break; } }
+    lo=Math.min(lo,55); hi=Math.max(hi,205);
+    if(hi-lo<24){ lo=0; hi=255; }
+    const t=new Uint8Array(256);
+    for(let k=0;k<256;k++) t[k]=clamp(Math.round((k-lo)*255/(hi-lo)),0,255);
+    lut.push(t);
+  }
+  for(let i=0;i<d.length;i+=4){ d[i]=lut[0][d[i]]; d[i+1]=lut[1][d[i+1]]; d[i+2]=lut[2][d[i+2]]; }
+}
+function unsharp(d,w,h,amt){
+  const cp = new Uint8ClampedArray(d);
+  for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){
+    const i=(y*w+x)*4;
+    for(let c=0;c<3;c++){
+      const blur=(cp[i-4+c]+cp[i+4+c]+cp[i-w*4+c]+cp[i+w*4+c]+2*cp[i+c])/6;
+      d[i+c]=clamp(cp[i+c]+amt*(cp[i+c]-blur),0,255);
+    }
+  }
+}
+
+/* ---------- 视图绘制与交互 ---------- */
+function setActive(side){
+  active = side;
+  $("tabFront").classList.toggle("on",side==="front");
+  $("tabBack").classList.toggle("on",side==="back");
+  drawView();
+  showResult();
+}
+function drawView(){
+  const o = sides[active];
+  if(!o.work){
+    $("view").style.display="none"; $("emptyHint").style.display="block";
+    return;
+  }
+  $("view").style.display="block"; $("emptyHint").style.display="none";
+  view.width=o.w; view.height=o.h;
+  vctx.clearRect(0,0,o.w,o.h);
+  vctx.drawImage(o.work,0,0);
+  const p=o.pts;
+  if(p && p.length===4){
+    const unit = Math.max(8, Math.round(Math.min(o.w,o.h)*0.014));
+    vctx.save();
+    vctx.beginPath();
+    vctx.rect(0,0,o.w,o.h);
+    vctx.moveTo(p[0][0],p[0][1]);
+    for(let i=3;i>=1;i--) vctx.lineTo(p[i][0],p[i][1]);
+    vctx.closePath();
+    vctx.fillStyle="rgba(18,32,46,0.42)";
+    vctx.fill("evenodd");
+    vctx.restore();
+    vctx.beginPath();
+    vctx.moveTo(p[0][0],p[0][1]);
+    for(let i=1;i<4;i++) vctx.lineTo(p[i][0],p[i][1]);
+    vctx.closePath();
+    vctx.strokeStyle="#12d39a"; vctx.lineWidth=Math.max(2,unit*0.16); vctx.stroke();
+    for(let i=0;i<4;i++){
+      vctx.beginPath(); vctx.arc(p[i][0],p[i][1],unit,0,Math.PI*2);
+      vctx.fillStyle="#ffffff"; vctx.fill();
+      vctx.lineWidth=Math.max(2,unit*0.2); vctx.strokeStyle="#0f6e56"; vctx.stroke();
+      vctx.beginPath(); vctx.arc(p[i][0],p[i][1],unit*0.32,0,Math.PI*2);
+      vctx.fillStyle="#0f6e56"; vctx.fill();
+    }
+  }
+}
+function showResult(){
+  const o=sides[active], im=$("resImg");
+  if(o.url){ im.src=o.url; im.style.display="block"; $("resState").textContent="1011 × 638 px · 300 dpi"; }
+  else { im.removeAttribute("src"); im.style.display="none"; $("resState").textContent="未生成"; }
+}
+function scheduleRender(delay){
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(()=>{
+    const o=sides[active];
+    if(!o.data){ return; }
+    try{ warp(o); showResult(); buildSheet(); }
+    catch(e){ log("校正失败：" + e.message); }
+  }, delay===undefined?180:delay);
+}
+function evToWork(e){
+  const r=view.getBoundingClientRect(), o=sides[active];
+  return [ (e.clientX-r.left)*o.w/r.width, (e.clientY-r.top)*o.h/r.height ];
+}
+view.addEventListener("pointerdown",e=>{
+  const o=sides[active]; if(!o.pts) return;
+  const [x,y]=evToWork(e);
+  const unit=Math.max(14,Math.min(o.w,o.h)*0.035);
+  let bi=-1, bd=Infinity;
+  for(let i=0;i<4;i++){
+    const d=Math.hypot(o.pts[i][0]-x,o.pts[i][1]-y);
+    if(d<bd){bd=d;bi=i;}
+  }
+  if(bd<=unit){ dragIdx=bi; view.setPointerCapture(e.pointerId); e.preventDefault(); }
+});
+view.addEventListener("pointermove",e=>{
+  if(dragIdx<0) return;
+  const o=sides[active], [x,y]=evToWork(e);
+  o.pts[dragIdx][0]=clamp(x,0,o.w-1);
+  o.pts[dragIdx][1]=clamp(y,0,o.h-1);
+  drawView();
+});
+function endDrag(){ if(dragIdx>=0){ dragIdx=-1; scheduleRender(120); } }
+view.addEventListener("pointerup",endDrag);
+view.addEventListener("pointercancel",endDrag);
+
+/* ---------- 打印页 ---------- */
+function buildSheet(){
+  for(const [side,imgId,boxId,wmId] of [["front","imgFront","boxFront","wmFront"],["back","imgBack","boxBack","wmBack"]]){
+    const o=sides[side], img=$(imgId), box=$(boxId), wm=$(wmId);
+    const ph=box.querySelector(".ph");
+    if(o.url){
+      img.src=o.url; img.style.display="block"; ph.style.display="none";
+    }else{
+      img.removeAttribute("src"); img.style.display="none"; ph.style.display="flex";
+    }
+    const txt=$("wmText").value.trim() || "仅供办理业务使用";
+    wm.innerHTML = "<span>" + txt.replace(/</g,"&lt;") + "<br>再次复印无效</span>";
+    wm.style.display = ($("optWm").checked && !!o.url) ? "flex" : "none";
+  }
+}
+function download(side){
+  const o=sides[side];
+  if(!o.url){ log((side==="front"?"人像面":"国徽面")+"尚未生成，请先上传照片"); return; }
+  const a=document.createElement("a");
+  a.href=o.url;
+  a.download=(side==="front"?"ID_front_1011x638_300dpi.png":"ID_back_1011x638_300dpi.png");
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  log("已导出 " + a.download);
+}
+
+/* ---------- 事件绑定 ---------- */
+for(const [dropId,fileId,side] of [["dropFront","fileFront","front"],["dropBack","fileBack","back"]]){
+  const drop=$(dropId), fi=$(fileId);
+  drop.addEventListener("click",()=>fi.click());
+  fi.addEventListener("change",e=>{ if(e.target.files[0]) loadSide(e.target.files[0],side); fi.value=""; });
+  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over");});
+  drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+  drop.addEventListener("drop",e=>{
+    e.preventDefault(); drop.classList.remove("over");
+    if(e.dataTransfer.files[0]) loadSide(e.dataTransfer.files[0],side);
+  });
+}
+document.addEventListener("paste",e=>{
+  const items=e.clipboardData && e.clipboardData.items;
+  if(!items) return;
+  for(let i=0;i<items.length;i++){
+    if(items[i].type.startsWith("image/")){
+      const f=items[i].getAsFile();
+      if(f){ loadSide(f,active); log("已从剪贴板粘贴图片"); }
+      break;
+    }
+  }
+});
+$("tabFront").addEventListener("click",()=>setActive("front"));
+$("tabBack").addEventListener("click",()=>setActive("back"));
+$("btnDetect").addEventListener("click",()=>{
+  const s=sides[active];
+  if(!s.data){ log("请先上传照片"); return; }
+  const det=autoDetect(active);
+  setConf(det);
+  log(det.ok ? "自动定位完成（置信度 "+Math.round(det.conf*100)+"%），请核对四角" : "自动定位置信度不足，请手动拖动四角");
+  drawView(); scheduleRender(0);
+});
+$("btnReset").addEventListener("click",()=>{
+  const s=sides[active];
+  if(!s.data){ log("请先上传照片"); return; }
+  s.pts=defaultPts(s.w,s.h);
+  $("confTag").textContent="已重置为默认框 · 请手动拖动四角";
+  $("confTag").style.color="var(--ink-3)";
+  drawView(); scheduleRender(0); log("已重置四角框");
+});
+function snapCorners(){
+  const o=sides[active];
+  if(!o.data||!o.pts){ log("请先上传照片"); return; }
+  const d=o.data.data, w=o.w, h=o.h;
+  const lum=(x,y)=>{ const k=(y*w+x)*4; return 0.299*d[k]+0.587*d[k+1]+0.114*d[k+2]; };
+  const xs=o.pts.map(p=>p[0]), ys=o.pts.map(p=>p[1]);
+  const x1=Math.min.apply(null,xs), x2=Math.max.apply(null,xs);
+  const y1=Math.min.apply(null,ys), y2=Math.max.apply(null,ys);
+  const R=Math.max(8,Math.round(Math.min(w,h)*0.025));
+  const stepX=Math.max(2,Math.floor((x2-x1)/48)), stepY=Math.max(2,Math.floor((y2-y1)/48));
+  const hScore=(y)=>{
+    if(y<1||y>=h-1) return -1;
+    let s=0,n=0;
+    for(let x=Math.round(x1)+4;x<x2-4;x+=stepX){ s+=Math.abs(lum(x,y+1)-lum(x,y-1)); n++; }
+    return n?s/n:-1;
+  };
+  const vScore=(x)=>{
+    if(x<1||x>=w-1) return -1;
+    let s=0,n=0;
+    for(let y=Math.round(y1)+4;y<y2-4;y+=stepY){ s+=Math.abs(lum(x+1,y)-lum(x-1,y)); n++; }
+    return n?s/n:-1;
+  };
+  let bx1=x1,bx2=x2,by1=y1,by2=y2;
+  let sTop=-1,sBot=-1,sLef=-1,sRig=-1;
+  for(let t=-R;t<=R;t+=2){
+    const a=hScore(Math.round(y1+t)); if(a>sTop){ sTop=a; by1=Math.round(y1+t); }
+    const b=hScore(Math.round(y2+t)); if(b>sBot){ sBot=b; by2=Math.round(y2+t); }
+    const c=vScore(Math.round(x1+t)); if(c>sLef){ sLef=c; bx1=Math.round(x1+t); }
+    const e=vScore(Math.round(x2+t)); if(e>sRig){ sRig=e; bx2=Math.round(x2+t); }
+  }
+  const a0=(x2-x1)*(y2-y1), a1=(bx2-bx1)*(by2-by1);
+  if(a1>a0*1.20||a1<a0*0.83||bx2-bx1<40||by2-by1<25){
+    log("未找到更可靠的边界，已保持原框");
+    return;
+  }
+  const dxL=bx1-x1, dxR=bx2-x2, dyT=by1-y1, dyB=by2-y2;
+  const cx=(v,hi)=>clamp(v,0,hi);
+  o.pts=[
+    [cx(o.pts[0][0]+dxL,w-1), cx(o.pts[0][1]+dyT,h-1)],
+    [cx(o.pts[1][0]+dxR,w-1), cx(o.pts[1][1]+dyT,h-1)],
+    [cx(o.pts[2][0]+dxR,w-1), cx(o.pts[2][1]+dyB,h-1)],
+    [cx(o.pts[3][0]+dxL,w-1), cx(o.pts[3][1]+dyB,h-1)]
+  ];
+  $("confTag").textContent="已智能贴合边界 · 请核对结果";
+  $("confTag").style.color="#185fa5";
+  drawView(); scheduleRender(0); log("四条边界已贴合到最强边缘，四角形状保持不变");
+}
+$("btnSnap").addEventListener("click",snapCorners);
+$("btnRotate").addEventListener("click",()=>{
+  const s=sides[active];
+  if(!s.work){ log("请先上传照片"); return; }
+  const cv=document.createElement("canvas");
+  cv.width=s.h; cv.height=s.w;
+  const cx=cv.getContext("2d",{willReadFrequently:true});
+  cx.translate(s.h,0); cx.rotate(Math.PI/2); cx.drawImage(s.work,0,0);
+  s.work=cv; s.w=cv.width; s.h=cv.height; s.data=cx.getImageData(0,0,s.w,s.h);
+  s.pts=defaultPts(s.w,s.h);
+  const det=autoDetect(active);
+  setConf(det);
+  drawView(); scheduleRender(0); log("照片已顺时针旋转 90° 并重新定位");
+});
+$("btnSwap").addEventListener("click",()=>{
+  const t=sides.front; sides.front=sides.back; sides.back=t;
+  const df=$("dropFront"), db=$("dropBack");
+  const swapImg=(a,b)=>{
+    const ai=a.querySelector("img"), bi=b.querySelector("img");
+    const as=ai?ai.src:null, bs=bi?bi.src:null;
+    if(as){ if(!bi){const n=document.createElement("img");b.insertBefore(n,b.firstChild);n.src=as;} else bi.src=as; }
+    else if(bi) bi.remove();
+    if(bs){ if(!ai){const n=document.createElement("img");a.insertBefore(n,a.firstChild);n.src=bs;} else ai.src=bs; }
+    else if(ai) ai.remove();
+    a.classList.toggle("has",!!bs); b.classList.toggle("has",!!as);
+  };
+  swapImg(df,db);
+  drawView(); showResult(); buildSheet(); log("已交换正反面");
+});
+for(const id of ["optLevels","optSharp","optRound"]) $(id).addEventListener("change",()=>scheduleRender(0));
+$("optWm").addEventListener("change",buildSheet);
+$("wmText").addEventListener("input",buildSheet);
+$("btnBuild").addEventListener("click",()=>{
+  let n=0;
+  for(const k of ["front","back"]) if(sides[k].data && !sides[k].url){ warp(sides[k]); }
+  for(const k of ["front","back"]) if(sides[k].url) n++;
+  buildSheet();
+  log("已生成 A4 打印页，含 " + n + " 面；点击「打印」前请核对缩放为 100%");
+  $("sheetWrap").scrollIntoView({behavior:"smooth",block:"start"});
+});
+$("btnPrint").addEventListener("click",()=>window.print());
+$("btnPrint2").addEventListener("click",()=>window.print());
+$("btnDlF").addEventListener("click",()=>download("front"));
+$("btnDlB").addEventListener("click",()=>download("back"));
+
+buildSheet();
+log("就绪。本工具不发起任何网络请求。");
+</script>
+</body>
+</html>
